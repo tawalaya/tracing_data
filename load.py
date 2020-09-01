@@ -5,42 +5,47 @@ import numpy as np
 import json
 from datetime import datetime
 
+import glob
+
+
 def load():
-    #this is ugly but i was lazy
-    experimentes = {
-        "baseline":("data/activations/activation_list_baseline_result.json","data/activations/fetchImages_baseline_result.json","data/performance/baseline_ow_logs.json"),
-        "provider":("data/activations/activation_list_provider_side_result.json","data/activations/fetchImages_provider_side_result.json","data/performance/provider_side_ow_logs.json"),
-        "function":("data/activations/activation_list_function_side_result.json","data/activations/fetchImages_function_side_result.json","data/performance/function_side_ow_logs.json")
-    }
 
     activations = None
     performance = None
-     
-    for e in experimentes.keys():
-        a = loadActivations(experimentes[e][0],e)
-        b = loadActivations(experimentes[e][1],e)
-        activation = pd.concat([a,b], sort=True)
 
-        perf = loadPerf(experimentes[e][2],e)
+    for f in glob.glob("data/*"):
+        ename = f
+        for a in glob.glob(f+"/activations/*.json"):
+            fname = a[a.rindex("/")+1:]
+            typeName =  "_".join(fname.split("_")[1:-1])
+    
+            activation = loadActivations(a,typeName,ename)
+            if (activations is None):
+                activations = activation
+            else:
+                activations = pd.concat([activations, activation], sort=True)
 
-        if (activations is None):
-            activations = activation
-        else:
-            activations = pd.concat([activations, activation], sort=True)
+        for a in glob.glob(f+"/performance/*.json"):
+            fname = a[a.rindex("/")+1:]
+            typeName =  "_".join(fname.split("_")[:-2])
+            
+            perf = loadPerf(a,typeName,ename)
 
-        if (performance is None):
-            performance = perf
-        else:
-            performance = pd.concat([performance, perf], sort=True)
+            if (performance is None):
+                performance = perf
+            else:
+                performance = pd.concat([performance, perf], sort=True)
+            
     
     return activations,performance
 
-def loadActivations(fname,ename):
+def loadActivations(fname,typeName,ename):
     activations = pd.read_json(fname)
-    activations["experiment"] = ename
+    activations["experiment"] = typeName
+    activations["enviroment"] = ename
     return activations
 
-def loadPerf(fname,ename):
+def loadPerf(fname,typeName,ename):
     with open(fname) as f:
         
         X = json.load(f)
@@ -59,7 +64,8 @@ def loadPerf(fname,ename):
                     frame[k[0]] = []
                 frame[k[0]].append(k[1])
     perf = pd.DataFrame.from_dict(frame)
-    perf["experiment"] = ename
+    perf["experiment"] = typeName
+    perf["enviroment"] = ename
     perf = perf.set_index("timestamp")
     return perf
 
